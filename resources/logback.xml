@@ -1,0 +1,20 @@
+<configuration>
+
+  <!-- prevent per-message overhead for jul logging calls, e.g. Hornet -->
+  <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator">
+    <resetJUL>true</resetJUL>
+  </contextListener>
+
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>{:time "%d{yyyy-MM-dd HH:mm:ss.SSS}" :level "%level" :thread "%thread" :logger "%logger" :msg %msg}%n</pattern>
+    </encoder>
+  </appender>
+
+  <logger name="lens.broker" level="INFO"/>
+  <logger name="lens.import-clinical-data" level="INFO"/>
+
+  <root level="INFO">
+    <appender-ref ref="STDOUT"/>
+  </root>
+</configuration>
