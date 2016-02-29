@@ -1,21 +1,19 @@
 (ns lens.broker
   (:use plumbing.core)
-  (:require [schema.core :as s :refer [Keyword Any Uuid Int]]
-            [lens.logging :as log :refer [error debug]]
-            [lens.util :refer [NonBlankStr]]
-            [clojure.core.async :refer [go go-loop <! >!]]
-            [lens.amqp-async :as aa]
-            [langohr.core :as rmq]
+  (:require [clojure.core.async :as async :refer [go go-loop <! >!]]
+            [clojure.java.io :as io]
+            [cognitect.transit :as t]
+            [com.stuartsierra.component :refer [Lifecycle]]
+            [langohr.basic :as lb]
             [langohr.channel :as ch]
+            [langohr.consumers :as co]
+            [langohr.core :as rmq]
             [langohr.exchange :as ex]
             [langohr.queue :as qu]
-            [langohr.basic :as lb]
-            [langohr.consumers :as co]
-            [com.stuartsierra.component :refer [Lifecycle]]
-            [cognitect.transit :as t]
-            [clj-uuid :as uuid]
-            [clojure.java.io :as io]
-            [clojure.core.async :as async])
+            [lens.amqp-async :as aa]
+            [lens.logging :as log :refer [error debug]]
+            [lens.util :refer [NonBlankStr]]
+            [schema.core :as s :refer [Keyword Any Uuid Int Str]])
   (:import [java.io ByteArrayOutputStream]
            [java.util.concurrent Executors]
            [com.rabbitmq.client Channel]))
@@ -30,16 +28,21 @@
 (def Command
   "A command is something which a subject likes to do in a system.
 
-  A command has a id which is an arbitrary UUID. The name of a command is a
-  keyword like :create-subject."
+  A command has an id which is an arbitrary UUID. The name of a command is a
+  keyword like :create-subject in imperative form. The sub is the name of the
+  subject which requested the command. The aid is the id of the aggregate on
+  which the command should be performed. If no aggragate id is specified, the
+  command will be performed against the whole database."
   {:id Uuid
    :name Keyword
-   (s/optional-key :params) Params
-   :sub NonBlankStr})
+   (s/optional-key :aid) Any
+   :sub NonBlankStr
+   (s/optional-key :params) Params})
 
 (def CommandVec
   "Short humand-writeable Command."
   [(s/one Keyword "name")
+   (s/optional Any "aggregate id")
    (s/optional Params "params")])
 
 (def Event
@@ -116,6 +119,7 @@
     (lb/publish ch "" queue (write command))
     (go
       (when-let [event (<! ch1)]
+        (debug {:event event})
         (async/unsub event-pub id ch1)
         (>! ch2 event))
       (async/close! ch2))
@@ -175,14 +179,13 @@
         (doseq [ch batch-chs]
           (subscribe ch batch-queue (delivery-fn env) (consumer-tag ch))))
       (aa/sub exchange "#" event-ch)
-      (assoc broker :conn conn :ch ch :chs batch-chs :event-ch event-ch
-                    :event-pub event-pub)))
+      (assoc broker :conn conn :ch ch :event-ch event-ch :event-pub event-pub)))
 
   (stop [broker]
     (info "Stop broker")
     (async/unsub-all event-pub)
     (rmq/close conn)
-    (assoc broker :event-pub nil :event-ch nil :batch-chs nil :ch nil :conn nil)))
+    (assoc broker :event-pub nil :event-ch nil :ch nil :conn nil)))
 
 (defn new-broker [opts]
   (cond-> opts

@@ -31,10 +31,10 @@
   NonBlankStr)
 
 (def TransactionType
-  (s/enum "Insert" "Update" "Remove" "Context"))
+  (s/enum "Insert" "Update" "Remove" "Upsert" "Context"))
 
 (def TxType
-  (s/enum :insert :update :remove :context))
+  (s/enum :insert :update :remove :upsert :context))
 
 (def DataType
   (s/enum :string :integer :float :datetime))
@@ -178,10 +178,14 @@
    :tx-type (tx-type item-group-data)
    :items
    (-> []
-       (into (map parse-string-item) (xml-> item-group-data :ItemDataString))
-       (into (map parse-integer-item) (xml-> item-group-data :ItemDataInteger))
-       (into (map parse-float-item) (xml-> item-group-data :ItemDataFloat))
-       (into (map parse-datetime-item) (xml-> item-group-data :ItemDataDateTime)))})
+       (into (map parse-string-item)
+             (xml-> item-group-data :ItemDataString))
+       (into (map parse-integer-item)
+             (xml-> item-group-data :ItemDataInteger))
+       (into (map parse-float-item)
+             (xml-> item-group-data :ItemDataFloat))
+       (into (map parse-datetime-item)
+             (xml-> item-group-data :ItemDataDatetime)))})
 
 (s/defn parse-form [form-data]
   {:form-oid (form-oid form-data)
@@ -204,30 +208,35 @@
 
 ;; ---- Commands --------------------------------------------------------------
 
-(s/defn create-subject [study-oid :- OID subject-key :- SubjectKey]
-  [:create-subject {:study-oid study-oid :subject-key subject-key}])
+(s/defn insert-subject [study-id :- Uuid subject-key :- SubjectKey]
+  [:odm-import/insert-subject study-id {:subject-key subject-key}])
+
+(s/defn upsert-subject [study-id :- Uuid subject-key :- SubjectKey]
+  [:odm-import/upsert-subject study-id {:subject-key subject-key}])
 
 (s/defn create-study-event [subject-id :- Uuid study-event-oid :- OID]
-  [:create-study-event {:subject-id subject-id
-                        :study-event-oid study-event-oid}])
+  [:odm-import/insert-study-event subject-id {:study-event-oid study-event-oid}])
+
+(s/defn upsert-study-event [subject-id :- Uuid study-event-oid :- OID]
+  [:odm-import/upsert-study-event subject-id {:study-event-oid study-event-oid}])
 
 (s/defn create-form [study-event-id :- Uuid form-oid :- OID]
-  [:create-form {:study-event-id study-event-id :form-oid form-oid}])
+  [:odm-import/insert-form study-event-id {:form-oid form-oid}])
 
 (s/defn create-item-group [form-id :- Uuid item-group-oid :- OID]
-  [:create-item-group {:form-id form-id :item-group-oid item-group-oid}])
+  [:odm-import/insert-item-group form-id {:item-group-oid item-group-oid}])
 
-(s/defn create-item [item-group-id :- Uuid item-oid :- OID
-                     data-type :- DataType value]
-  [:create-item {:item-group-id item-group-id :item-oid item-oid
-                 :data-type data-type :value value}])
+(s/defn create-item [item-group-id :- Uuid item-oid :- OID data-type :- DataType
+                     value]
+  [:odm-import/insert-item item-group-id {:item-oid item-oid :data-type data-type
+                               :value value}])
 
 ;; ---- Events ----------------------------------------------------------------
 
 (defn validation-failed [e]
-  [:clinical-data-import/validation-failed
-   (-> (select-keys (ex-data e) [:schema :value])
-       (assoc :tag (:tag (zip/node (:loc (ex-data e))))))])
+  {:name :clinical-data-import/validation-failed
+   :data (-> (select-keys (ex-data e) [:schema :value])
+             (assoc :tag (:tag (zip/node (:loc (ex-data e))))))})
 
 ;; ---- Other -----------------------------------------------------------------
 
@@ -260,13 +269,14 @@
 (defmethod handle-item-group-data :insert
   [send-command form-id {:keys [item-group-oid items]} event-ch]
   (let [ch (send-command (create-item-group form-id item-group-oid))
-        af (partial handle-item-data send-command)]
+        af (partial handle-item-data send-command
+                    (uuid/v5 form-id item-group-oid))]
     (go
       (if-let [event (<! ch)]
         (do
           (>! event-ch event)
           (if (= :item-group/created (:name event))
-            (pipeline event-ch (partial af (:id (:data event))) items)
+            (pipeline event-ch af items)
             (async/close! event-ch)))
         (async/close! event-ch)))))
 
@@ -275,13 +285,14 @@
 (defmethod handle-form-data :insert
   [send-command study-event-id {:keys [form-oid item-groups]} event-ch]
   (let [ch (send-command (create-form study-event-id form-oid))
-        af (partial handle-item-group-data send-command)]
+        af (partial handle-item-group-data send-command
+                    (uuid/v5 study-event-id form-oid))]
     (go
       (if-let [event (<! ch)]
         (do
           (>! event-ch event)
           (if (= :form/created (:name event))
-            (pipeline event-ch (partial af (:id (:data event))) item-groups)
+            (pipeline event-ch af item-groups)
             (async/close! event-ch)))
         (async/close! event-ch)))))
 
@@ -290,35 +301,72 @@
 (defmethod handle-study-event-data :insert
   [send-command subject-id {:keys [study-event-oid forms]} event-ch]
   (let [ch (send-command (create-study-event subject-id study-event-oid))
-        af (partial handle-form-data send-command)]
+        af (partial handle-form-data send-command
+                    (uuid/v5 subject-id study-event-oid))]
     (go
       (if-let [event (<! ch)]
         (do
           (>! event-ch event)
           (if (= :study-event/created (:name event))
-            (pipeline event-ch (partial af (:id (:data event))) forms)
+            (pipeline event-ch af forms)
+            (async/close! event-ch)))
+        (async/close! event-ch)))))
+
+(defmethod handle-study-event-data :upsert
+  [send-command subject-id {:keys [study-event-oid forms]} event-ch]
+  (let [ch (send-command (upsert-study-event subject-id study-event-oid))
+        af (partial handle-form-data send-command
+                    (uuid/v5 subject-id study-event-oid))]
+    (go
+      (if-let [event (<! ch)]
+        (do
+          (>! event-ch event)
+          (if (#{:study-event/created :study-event/updated} (:name event))
+            (pipeline event-ch af forms)
             (async/close! event-ch)))
         (async/close! event-ch)))))
 
 (defmulti handle-subject-data dispatch)
 
 (defmethod handle-subject-data :insert
-  [send-command study-oid {:keys [subject-key study-events]} event-ch]
-  (let [ch (send-command (create-subject study-oid subject-key))
-        af (partial handle-study-event-data send-command)]
+  [send-command study-id {:keys [subject-key study-events]} event-ch]
+  (let [ch (send-command (insert-subject study-id subject-key))
+        af (partial handle-study-event-data send-command
+                    (uuid/v5 study-id subject-key))]
     (go
       (if-let [event (<! ch)]
         (do
           (>! event-ch event)
           (if (= :subject/created (:name event))
-            (pipeline event-ch (partial af (:id (:data event))) study-events)
+            (pipeline event-ch af study-events)
             (async/close! event-ch)))
         (async/close! event-ch)))))
+
+(defmethod handle-subject-data :upsert
+  [send-command study-id {:keys [subject-key study-events]} event-ch]
+  (let [ch (send-command (upsert-subject study-id subject-key))
+        af (partial handle-study-event-data send-command
+                    (uuid/v5 study-id subject-key))]
+    (go
+      (if-let [event (<! ch)]
+        (do
+          (>! event-ch event)
+          (if (#{:subject/created :subject/updated} (:name event))
+            (pipeline event-ch af study-events)
+            (async/close! event-ch)))
+        (async/close! event-ch)))))
+
+(defmethod handle-subject-data :update
+  [send-command study-id {:keys [subject-key study-events]} event-ch]
+  (let [af (partial handle-study-event-data send-command
+                    (uuid/v5 study-id subject-key))]
+    (pipeline event-ch af study-events)))
 
 (s/defn handle-clinical-data
   [send-command {:keys [study-oid subjects]} :- ClinicalData]
   (let [event-ch (chan)]
-    (pipeline event-ch (partial handle-subject-data send-command study-oid) subjects)
+    (pipeline event-ch (partial handle-subject-data send-command
+                                (uuid/v5 uuid/+null+ study-oid)) subjects)
     (<!! (go-loop []
            (when-let [event (<! event-ch)]
              (if (= "transaction-failed" (name (:name event)))
@@ -326,15 +374,17 @@
                (debug {:event event}))
              (recur))))))
 
-(defn command [name sub params]
-  (-> {:id (uuid/squuid)
-       :name name
-       :sub sub}
-      (assoc-when :params params)))
+(defn command [name sub params-or-aid params]
+  (cond-> {:id (uuid/squuid)
+           :name name
+           :sub sub}
+    (not (map? params-or-aid)) (assoc :aid params-or-aid)
+    (map? params-or-aid) (assoc :params params-or-aid)
+    params (assoc :params params)))
 
 (defn send-command-fn [broker sub]
-  (fn [[name params]]
-    (b/send-command broker (command name sub params))))
+  (fn [[name params-or-aid params]]
+    (b/send-command broker (command name sub params-or-aid params))))
 
 (defn read-and-parse-file [file]
   (let [start (System/nanoTime)
@@ -342,7 +392,8 @@
                  (xml/parse)
                  (zip/xml-zip)
                  (parse-clinical-data))]
-    (info (format "Finished reading and parsing the file in %.1f s." (/ (u/duration start) 1000)))
+    (info (format "Finished reading and parsing the file in %.1f s."
+                  (/ (u/duration start) 1000)))
     data))
 
 (defmethod handle-command :import-clinical-data
@@ -356,12 +407,5 @@
         (case (:type (ex-data e))
           ::validation-error (send-event broker (validation-failed e))
           (throw e))))
-    (info (format "Finished import of clinical data in %.1f s." (/ (u/duration start) 1000)))))
-
-(comment
-
-  (count (b/write ((fn [[name params]] (command name "akiel" params))
-                    (create-item (uuid/squuid) "T00001_F0001" :integer 1))))
-
-  (async/thread)
-  )
+    (info (format "Finished import of clinical data in %.1f s."
+                  (/ (u/duration start) 1000)))))
