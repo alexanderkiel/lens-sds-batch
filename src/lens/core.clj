@@ -12,10 +12,11 @@
   (.availableProcessors (Runtime/getRuntime)))
 
 (defn -main [& _]
-  (letk [[port thread version :as system] (new-system env)]
+  (letk [[port thread version broker :as system] (new-system env)]
     (comp/start system)
     (info {:version version})
     (info {:max-memory (max-memory)})
     (info {:num-cpus (available-processors)})
+    (info {:broker (:host broker)})
     (info {:listen (str "0.0.0.0:" port)})
     (info {:num-worker-threads thread})))
