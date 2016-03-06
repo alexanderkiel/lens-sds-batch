@@ -157,7 +157,7 @@
   (str "lens-sds-batch." (.getChannelNumber ch)))
 
 (defrecord Broker [host port username password conn ch batch-chs queue
-                   batch-queue exchange event-ch event-pub num-batch-threads]
+                   batch-queue exchange event-pub num-batch-threads]
   Lifecycle
   (start [broker]
     (info (str "Start broker on queue " batch-queue))
@@ -180,13 +180,13 @@
           (lb/qos ch 1)
           (subscribe ch batch-queue (delivery-fn env) (consumer-tag ch))))
       (aa/sub exchange "#" event-ch)
-      (assoc broker :conn conn :ch ch :event-ch event-ch :event-pub event-pub)))
+      (assoc broker :conn conn :ch ch :event-pub event-pub)))
 
   (stop [broker]
     (info "Stop broker")
     (async/unsub-all event-pub)
     (rmq/close conn)
-    (assoc broker :event-pub nil :event-ch nil :ch nil :conn nil)))
+    (assoc broker :event-pub nil :ch nil :conn nil)))
 
 (defn new-broker [opts]
   (cond-> opts
