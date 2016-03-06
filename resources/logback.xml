@@ -12,7 +12,7 @@
   </appender>
 
   <logger name="lens.broker" level="INFO"/>
-  <logger name="lens.import-clinical-data" level="INFO"/>
+  <logger name="lens.import-clinical-data" level="DEBUG"/>
 
   <root level="INFO">
     <appender-ref ref="STDOUT"/>
