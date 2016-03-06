@@ -139,11 +139,6 @@
   (debug {:event event})
   (lb/publish ch exchange (event-routing-key name) (write event)))
 
-(s/defn subscribe-event
-  {:arglists '([broker event-name ch])}
-  [{:keys [event-pub]} event-name :- Keyword ch]
-  (async/sub event-pub event-name ch))
-
 ;; ---- Broker ----------------------------------------------------------------
 
 (defn- info [msg]
