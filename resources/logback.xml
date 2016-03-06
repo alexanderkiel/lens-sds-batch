@@ -11,7 +11,7 @@
     </encoder>
   </appender>
 
-  <logger name="lens.broker" level="INFO"/>
+  <logger name="lens.broker" level="DEBUG"/>
   <logger name="lens.import-clinical-data" level="DEBUG"/>
 
   <root level="INFO">
