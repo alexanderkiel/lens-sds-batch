@@ -89,7 +89,6 @@
               (lb/reject ch delivery-tag))
           (do (debug {:ch-num (.getChannelNumber ch)
                       :delivery-tag delivery-tag
-                      :message-id message-id
                       :cmd cmd})
               (try
                 (handle-command env cmd (:params cmd))
