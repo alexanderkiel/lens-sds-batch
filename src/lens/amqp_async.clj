@@ -4,7 +4,8 @@
             [langohr.basic :as lb]
             [langohr.channel :as lch]
             [langohr.queue :as lqu]
-            [langohr.consumers :as lco]))
+            [langohr.consumers :as lco]
+            [lens.logging :refer [debug]]))
 
 (defprotocol AmqpChannel
   (amqp-channel [ch] "Returns the underlying AMQP channel.")
@@ -12,6 +13,7 @@
 
 (defn- delivery-fn [ch]
   (fn [amqp-ch meta payload]
+    (debug {:action :receive-msg :payload-size (count payload)})
     (>!! ch payload)
     (lb/ack amqp-ch (:delivery-tag meta))))
 

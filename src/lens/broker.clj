@@ -114,12 +114,12 @@
   [{:keys [ch queue event-pub]} {:keys [id] :as command} :- Command]
   (let [ch1 (async/chan)
         ch2 (async/chan)]
-    (debug {:command command})
+    (debug {:action :send-command :command command})
     (async/sub event-pub id ch1)
     (lb/publish ch "" queue (write command))
     (go
       (when-let [event (<! ch1)]
-        (debug {:event event})
+        (debug {:action :receive-event :event event})
         (async/unsub event-pub id ch1)
         (>! ch2 event))
       (async/close! ch2))

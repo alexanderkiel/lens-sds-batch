@@ -13,6 +13,7 @@
 
   <logger name="lens.broker" level="DEBUG"/>
   <logger name="lens.import-clinical-data" level="DEBUG"/>
+  <logger name="lens.amqp-async" level="DEBUG"/>
 
   <root level="INFO">
     <appender-ref ref="STDOUT"/>
