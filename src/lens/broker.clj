@@ -177,6 +177,7 @@
       (let [env {:broker (assoc broker :ch ch :exchange exchange
                                        :event-pub event-pub)}]
         (doseq [ch batch-chs]
+          (lb/qos ch 1)
           (subscribe ch batch-queue (delivery-fn env) (consumer-tag ch))))
       (aa/sub exchange "#" event-ch)
       (assoc broker :conn conn :ch ch :event-ch event-ch :event-pub event-pub)))
