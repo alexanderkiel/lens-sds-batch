@@ -13,7 +13,7 @@
     :thread 1
 
     :broker
-    (new-broker {:host broker-host})
+    (new-broker {:host broker-host :num-batch-threads 1})
 
     :server
     (comp/using (new-server) [:port :thread :broker])))
