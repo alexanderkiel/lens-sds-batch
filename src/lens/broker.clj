@@ -155,7 +155,7 @@
   Lifecycle
   (start [broker]
     (info (str "Start broker on queue " batch-queue))
-    (let [opts (cond-> {:executor (Executors/newFixedThreadPool num-batch-threads)}
+    (let [opts (cond-> {}
                  host (assoc :host host)
                  port (assoc :port port)
                  username (assoc :username username)
