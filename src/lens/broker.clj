@@ -163,7 +163,9 @@
           conn (rmq/connect opts)
           ch (ch/open conn)
           batch-chs (for [_ (range num-batch-threads)] (ch/open conn))
-          event-ch (aa/chan conn 16 (map read-transit) {:consumer-tag "lens-sds-batch"})
+          event-ch (aa/chan conn 16 (map read-transit)
+                            {:queue-name "lens-sds-batch.events"
+                             :consumer-tag "lens-sds-batch"})
           event-pub (async/pub event-ch :cid)]
       (ex/declare ch exchange "topic" {:durable true})
       (qu/declare ch queue {:durable true :auto-delete false})

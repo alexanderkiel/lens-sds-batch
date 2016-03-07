@@ -17,8 +17,15 @@
     (>!! ch payload)
     (lb/ack amqp-ch (:delivery-tag meta))))
 
+(defn- declare-queue [amqp-ch {:keys [queue-name]}]
+  (if queue-name
+    (lqu/declare amqp-ch queue-name {:exclusive true})
+    (lqu/declare-server-named amqp-ch)))
+
 (defn chan
-  "It's not cheap to create a channel!"
+  "It's not cheap to create a channel!
+
+  Opts accept :queue-name and :consumer-tag."
   ([conn]
    (chan conn 1))
   ([conn n]
@@ -29,7 +36,8 @@
    (let [amqp-ch (lch/open conn)
          _ (lb/qos amqp-ch n)
          ch (async/chan n xform)
-         queue (lqu/declare-server-named amqp-ch)]
+         queue (declare-queue amqp-ch opts)]
+     (debug {:action :subscribe})
      (lco/subscribe amqp-ch queue (delivery-fn ch) (select-keys opts [:consumer-tag]))
      (reify
        ReadPort
