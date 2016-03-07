@@ -24,7 +24,8 @@
                  [com.taoensso/carmine "2.12.2"]
                  [com.stuartsierra/component "0.3.0"]
                  [environ "1.0.1"]
-                 [danlentz/clj-uuid "0.1.6"]]
+                 [danlentz/clj-uuid "0.1.6"]
+                 [org.clojars.akiel/shortid "0.1.2"]]
 
   :profiles {:dev
              {:source-paths ["dev"]

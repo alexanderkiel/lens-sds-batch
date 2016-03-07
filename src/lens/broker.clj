@@ -13,9 +13,9 @@
             [lens.amqp-async :as aa]
             [lens.logging :as log :refer [error debug]]
             [lens.util :refer [NonBlankStr]]
-            [schema.core :as s :refer [Keyword Any Uuid Int Str]])
+            [schema.core :as s :refer [Keyword Any Uuid Int Str]]
+            [shortid.core :as shortid])
   (:import [java.io ByteArrayOutputStream]
-           [java.util.concurrent Executors]
            [com.rabbitmq.client Channel]))
 
 (set! *warn-on-reflection* true)
@@ -164,7 +164,7 @@
           ch (ch/open conn)
           batch-chs (for [_ (range num-batch-threads)] (ch/open conn))
           event-ch (aa/chan conn 16 (map read-transit)
-                            {:queue-name "lens-sds-batch.events"
+                            {:queue-name (str "lens-sds-batch.events-" (shortid/generate 5))
                              :consumer-tag "lens-sds-batch"})
           event-pub (async/pub event-ch :cid)]
       (ex/declare ch exchange "topic" {:durable true})
