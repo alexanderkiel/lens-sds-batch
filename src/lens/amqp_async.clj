@@ -19,7 +19,7 @@
 
 (defn- declare-queue [amqp-ch {:keys [queue-name]}]
   (if queue-name
-    (lqu/declare amqp-ch queue-name {:exclusive true})
+    (do (lqu/declare amqp-ch queue-name {:exclusive true}) queue-name)
     (lqu/declare-server-named amqp-ch)))
 
 (defn chan
@@ -37,7 +37,7 @@
          _ (lb/qos amqp-ch n)
          ch (async/chan n xform)
          queue (declare-queue amqp-ch opts)]
-     (debug {:action :subscribe})
+     (debug {:action :subscribe :queue queue})
      (lco/subscribe amqp-ch queue (delivery-fn ch) (select-keys opts [:consumer-tag]))
      (reify
        ReadPort
