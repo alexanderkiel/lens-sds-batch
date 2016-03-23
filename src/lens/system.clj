@@ -6,7 +6,8 @@
             [lens.util :as u]
             [lens.import-clinical-data]))
 
-(defnk new-system [lens-sds-batch-version port broker-host {broker-port "5672"}]
+(defnk new-system [lens-sds-batch-version port broker-host {broker-port "5672"}
+                   {broker-username "guest"} {broker-password "guest"}]
   (comp/system-map
     :version lens-sds-batch-version
     :port (u/parse-long port)
@@ -14,6 +15,7 @@
 
     :broker
     (new-broker {:host broker-host :port (u/parse-long broker-port)
+                 :username broker-username :password broker-password
                  :num-batch-threads 1})
 
     :server
