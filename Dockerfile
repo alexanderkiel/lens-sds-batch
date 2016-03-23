@@ -1,8 +1,4 @@
-FROM java:8
-
-ENV LEIN_ROOT true
-ADD https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein /usr/local/bin/lein
-RUN chmod +x /usr/local/bin/lein
+FROM clojure:lein-2.5.3
 
 COPY dev /app/dev
 COPY resources /app/resources
