@@ -30,20 +30,12 @@
 
   A command has an id which is an arbitrary UUID. The name of a command is a
   keyword like :create-subject in imperative form. The sub is the name of the
-  subject which requested the command. The aid is the id of the aggregate on
-  which the command should be performed. If no aggragate id is specified, the
-  command will be performed against the whole database."
+  subject which requested the command."
   {:id Uuid
    :name Keyword
-   (s/optional-key :aid) Any
    :sub NonBlankStr
-   (s/optional-key :params) Params})
-
-(def CommandVec
-  "Short humand-writeable Command."
-  [(s/one Keyword "name")
-   (s/optional Any "aggregate id")
-   (s/optional Params "params")])
+   (s/optional-key :params) Params
+   Any Any})
 
 (def Event
   "An event is something which happend in a system.
