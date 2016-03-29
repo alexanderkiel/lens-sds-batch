@@ -1,4 +1,4 @@
-FROM clojure:lein-2.5.3
+FROM akiel/lens-clojure:0.1
 
 COPY dev /app/dev
 COPY resources /app/resources
