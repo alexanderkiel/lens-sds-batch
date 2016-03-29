@@ -1,6 +1,7 @@
 (ns lens.import-clinical-data
   (:use plumbing.core)
-  (:require [clj-uuid :as uuid]
+  (:require [clj-time.coerce :as tc]
+            [clj-uuid :as uuid]
             [clojure.core.async :as async :refer [<!! <! >! chan go go-loop]]
             [clojure.data.xml :as xml]
             [lens.broker :as b :refer [handle-command send-event]]
@@ -11,7 +12,8 @@
                                                 ClinicalData
                                                 ODMFile]]
             [schema.core :as s :refer [Uuid Str Int Any Num]])
-  (:import [clojure.lang Keyword]))
+  (:import [clojure.lang Keyword]
+           [org.joda.time DateTime]))
 
 ;; ---- Commands --------------------------------------------------------------
 
@@ -49,11 +51,19 @@
 (s/defn remove-item-group [form-id :- Uuid item-group-oid :- OID]
   [:odm-import/remove-item-group {:form-id form-id :item-group-oid item-group-oid}])
 
-(s/defn insert-item [item-group-id :- Uuid item-oid :- OID data-type :- DataType value]
-  [:odm-import/insert-item {:item-group-id item-group-id :item-oid item-oid :data-type data-type :value value}])
+(defn- coerce [value]
+  (if (instance? DateTime value)
+    (tc/to-date value)
+    value))
+
+(s/defn insert-item
+  [item-group-id :- Uuid item-oid :- OID data-type :- DataType value]
+  [:odm-import/insert-item {:item-group-id item-group-id :item-oid item-oid
+                            :data-type data-type :value (coerce value)}])
 
 (s/defn update-item [item-id :- Uuid data-type :- DataType value]
-  [:odm-import/update-item {:item-id item-id :data-type data-type :value value}])
+  [:odm-import/update-item {:item-id item-id :data-type data-type
+                            :value (coerce value)}])
 
 (s/defn remove-item [item-group-id :- Uuid item-oid :- OID]
   [:odm-import/remove-item {:item-group-id item-group-id :item-oid item-oid}])
