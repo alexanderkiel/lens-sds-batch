@@ -30,6 +30,7 @@
   :profiles {:dev
              {:source-paths ["dev"]
               :dependencies [[org.clojure/tools.namespace "0.2.4"]
+                             [org.clojure/test.check "0.9.0"]
                              [criterium "0.4.3"]
                              [juxt/iota "0.2.0"]]
               :global-vars {*print-length* 20}}
