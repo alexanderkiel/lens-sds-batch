@@ -1,4 +1,4 @@
-(defproject lens-sds-batch "0.2"
+(defproject lens-sds-batch "0.3"
   :description "Lens Study Data Store Batch Processor"
   :url "https://github.com/alexanderkiel/lens-sds-batch"
   :license {:name "Eclipse Public License"
