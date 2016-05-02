@@ -2,6 +2,9 @@
   (:require [clj-uuid :as uuid]
             [clojure.core.async :refer [<!! chan go]]
             [clojure.test :refer :all]
+            [clojure.test.check.clojure-test :refer [defspec]]
+            [clojure.test.check.generators :as gen]
+            [clojure.test.check.properties :as prop]
             [lens.import-clinical-data :refer :all]))
 
 (deftest handle-subject-data-test
@@ -254,3 +257,24 @@
       (handle-item-data send-command item-group-id nil ["I1" item] event-ch)
       (is (= (<!! event-ch) ::event))
       (is (nil? (<!! event-ch))))))
+
+(def batch-cmd-id #uuid "2a302e1b-3cb4-425e-bca9-db7831d81e69d")
+
+(deftest gen-cmd-id-test
+  (testing "Fixed example to ensure the implementation is independend of JVM."
+    (are [name params id] (= id (gen-cmd-id batch-cmd-id name params))
+      :odm-import/insert-subject {:study-id "S1" :subject-key "SUB1"}
+      #uuid "75e752d9-c2bf-53dc-82dd-97f4c05363ec"))
+  (testing "Order of params is not important"
+    (is (= (gen-cmd-id batch-cmd-id :foo {:a "1" :b "2"})
+           (gen-cmd-id batch-cmd-id :foo {:b "2" :a "1"})))))
+
+(defspec gen-cmd-id-name-distinct 1000
+  (prop/for-all [[name-1 name-2] (gen/list-distinct gen/string {:num-elements 2})]
+    (not= (gen-cmd-id batch-cmd-id name-1 {})
+          (gen-cmd-id batch-cmd-id name-2 {}))))
+
+(defspec gen-cmd-id-param-distinct 1000
+  (prop/for-all [[val-1 val-2] (gen/list-distinct gen/string {:num-elements 2})]
+    (not= (gen-cmd-id batch-cmd-id :foo {:bar val-1})
+          (gen-cmd-id batch-cmd-id :foo {:bar val-2}))))

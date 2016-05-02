@@ -285,15 +285,20 @@
                (debug {:event event}))
              (recur))))))
 
-(defn- command [name sub params]
-  {:id (uuid/squuid)
+(defn gen-cmd-id [batch-cmd-id name params]
+  (uuid/v5 batch-cmd-id (conj (flatten (sort-by first params)) name)))
+
+(defn- command
+  "Creates a command using the batch commands id as namespace for the id."
+  [{:keys [id sub]} name params]
+  {:id (gen-cmd-id id name params)
    :name name
    :sub sub
    :params params})
 
-(defn send-command-fn [broker sub]
+(defn send-command-fn [broker batch-cmd]
   (s/fn [[name params] :- Cmd]
-    (b/send-command broker (command name sub params))))
+    (b/send-command broker (command batch-cmd name params))))
 
 (s/defn read-and-parse-file :- ODMFile [file :- File]
   (let [start (System/nanoTime)
@@ -305,13 +310,13 @@
     data))
 
 (defmethod handle-command :import-clinical-data
-  [{:keys [broker]} {:keys [sub] :as cmd} {:keys [file]}]
+  [{:keys [broker]} cmd {:keys [file]}]
   (s/validate File file)
   (info "Start import of clinical data...")
   (let [start (System/nanoTime)]
     (try
       (->> (read-and-parse-file file)
-           (handle-odm-file (send-command-fn broker sub)))
+           (handle-odm-file (send-command-fn broker cmd)))
       (catch Exception e
         (case (:type (ex-data e))
           ::p/validation-error

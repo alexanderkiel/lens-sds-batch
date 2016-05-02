@@ -1,6 +1,8 @@
 (ns lens.util
-  (:require [clojure.string :as str]
-            [schema.core :as s :refer [Int]]))
+  (:require [clj-uuid :as uuid]
+            [clojure.string :as str]
+            [schema.core :as s :refer [Int]])
+  (:import [java.io ByteArrayOutputStream]))
 
 (defn parse-long [s]
   (Long/parseLong s))
@@ -24,3 +26,18 @@
 
 (def NonNegInt
   (s/constrained s/Int (comp not neg?) 'non-neg?))
+
+;; ---- UUID ------------------------------------------------------------------
+
+(extend-protocol uuid/UUIDNameBytes
+
+  clojure.lang.Keyword
+  (as-byte-array ^bytes [this]
+    (uuid/as-byte-array (str this)))
+
+  clojure.lang.Seqable
+  (as-byte-array ^bytes [this]
+    (let [baos (ByteArrayOutputStream.)]
+      (doseq [x (seq this)]
+        (.write baos ^bytes (uuid/as-byte-array x)))
+      (.toByteArray baos))))
